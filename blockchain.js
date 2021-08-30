@@ -39,5 +39,18 @@ Blockchain.prototype.generateHash = function(previousBlockHash,currentBlockData,
     return hash;
 }
 
+Blockchain.prototype.proofOfWork = function(previousBlockHash,currentBlockData){
+    let nonce = 0;
+    let hash = this.generateHash(previousBlockHash,currentBlockData,nonce)
+    //cryptographic puzzle
+    while(hash.substring(0,5) != '00000'){
+        nonce++;
+        hash = this.generateHash(previousBlockHash, currentBlockData, nonce);
+        console.log(hash);
+    }
+    return nonce;
+ 
+}
+
 
 module.exports = Blockchain; //give access to other files to import the constructor Blockchain
