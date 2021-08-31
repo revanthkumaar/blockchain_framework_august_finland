@@ -1,24 +1,27 @@
 {
   "dependencies": {
+    "express": "^4.17.1",
     "sha256": "^0.2.0"
   },
   "name": "blockchain_framework",
   "version": "1.0.0",
   "main": "blockchain.js",
-  "devDependencies": {},
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "node_active":"nodemon server.js"
   },
   "repository": {
-    "type": "git",
+    "type": "git",     
     "url": "git+https://github.com/revanthkumaar/blockchain_framework_august_finland.git"
   },
-  "keywords": [],
+  "keywords": [],    
   "author": "",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/revanthkumaar/blockchain_framework_august_finland/issues"
   },
   "homepage": "https://github.com/revanthkumaar/blockchain_framework_august_finland#readme",
-  "description": ""
+  "description": "",
+  "devDependencies": {
+    "nodemon": "^2.0.12"
+  }
 }
