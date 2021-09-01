@@ -6,7 +6,7 @@ const landRec = new Blockchain();
 landRecBackend.use(bodyParser.json());
 landRecBackend.use(bodyParser.urlencoded({ extended: false }));
 
-const port = 
+const port = process.argv[2]
 
 
 landRecBackend.get('/home',function(req,res){
@@ -34,5 +34,5 @@ landRecBackend.post('/transaction',function(req,res){
 
 
 landRecBackend.listen(port, function() {
-	console.log(`Listening on port`);
+	console.log(`Listening on port ${port}`);
 });
