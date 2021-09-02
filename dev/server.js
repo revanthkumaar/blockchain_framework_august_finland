@@ -33,6 +33,19 @@ landRecBackend.post('/transaction',function(req,res){
 });
 
 
+landRecBackend.post('/register-node',function(req,res){
+    const newNodeAddress = req.body.nodeAddress;
+    const nodeNotAlreadyPresent = landRec.networkNodes.indexOf(newNodeAddress) == -1;
+    const notCurrentNode = landRec.currentNodeUrl !== newNodeAddress;
+    if(nodeNotAlreadyPresent && notCurrentNode){
+      landRec.networkNodes.push(newNodeAddress);
+      res.json({ note: "new node registered successfully" });
+    }
+})
+
+
+
+
 landRecBackend.listen(port, function() {
 	console.log(`Listening on port ${port}`);
 });
