@@ -1,12 +1,11 @@
 const express = require("express");
 const landRecBackend = express();
-const bodyParser = require("body-parser");
 const Blockchain = require("./blockchain");
 const landRec = new Blockchain();
+const bodyParser = require("body-parser");
 landRecBackend.use(bodyParser.json());
 landRecBackend.use(bodyParser.urlencoded({ extended: false }));
 const rp = require('request-promise')
-
 const port = process.argv[2];
 
 landRecBackend.get("/home", function (req, res) {
@@ -53,9 +52,11 @@ landRecBackend.post('/transaction/broadcast',function(req,res){
    })
 })
 
-landRecBackend.post('register-broadcast-node',function(req,res){
+landRecBackend.post('/register-broadcast-node',function(req,res){
   //STEP-1 register the new node address at the node where it pings first
-  const newNodeUrl = req.body.newNodeurl;
+  const newNodeUrl = req.body.newNodeUrl;
+  console.log(newNodeUrl);
+  console.log(landRec.networkNodes);
   if(landRec.networkNodes.indexOf(newNodeUrl) == -1) {
     landRec.networkNodes.push(newNodeUrl);
   }
@@ -104,7 +105,7 @@ landRecBackend.post("/register-node", function (req, res) {
 landRecBackend.post("/register-nodes-bulk", function (req, res) {
   const newNodeAddresses = req.body.nodeAddresses;
 
-  newNodeAddresses.forEach((oneNodeUrl) => {
+  landRec.networkNodes.forEach((oneNodeUrl) => {
     const nodeNotAlreadyPresent =
       landRec.networkNodes.indexOf(oneNodeUrl) == -1;
     const notCurrentNode = landRec.currentNodeUrl !== oneNodeUrl;
