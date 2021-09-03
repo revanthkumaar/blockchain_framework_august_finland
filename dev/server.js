@@ -30,6 +30,29 @@ landRecBackend.post("/transaction", function (req, res) {
   res.json({ message: "transaction is created" });
 });
 
+//MAIN STEP-1 BROADCAST TRANSACTIONS //////////////////////////////////
+
+landRecBackend.post('/transaction/broadcast',function(req,res){
+   const newTransaction = landRec.createNewTransaction(req.body.seller,req.body.receiver,req.body.asset)
+
+   //broadcasting the transaction object to all other nodes
+
+   const requestPromises = [];
+   landRec.networkNodes.forEach((networkNodeUrl) => {
+     const requestOptions = {
+       url: networkNodeUrl + "/transaction",
+       method: "POST",
+       body: newTransaction,
+       json: true,
+     };
+     requestPromises.push(rp(requestOptions)); //call gets triggered
+   });
+
+   Promise.all(reqestPromises).then(data => {
+     res.json({note: 'transaction got successfully broadcasted, will take few mins to validate your transaction'})
+   })
+})
+
 landRecBackend.post('register-broadcast-node',function(req,res){
   //STEP-1 register the new node address at the node where it pings first
   const newNodeUrl = req.body.newNodeurl;
