@@ -79,10 +79,12 @@ landRecBackend.post('/register-broadcast-node',function(req,res){
     Promise.all(regNodesPromises)
     .then(data => {
         const bulkRegisterOptions = {
-          url: newNodeUrl + '/register-nodes-bulk',
-          method:'POST',
-          body: {allNetworkNodes: [...landRec.networkNodes,landRec.currentNodeUrl]},
-          json: true
+          url: newNodeUrl + "/register-nodes-bulk",
+          method: "POST",
+          body: {
+            nodeAddresses: [...landRec.networkNodes, landRec.currentNodeUrl],
+          },
+          json: true,
         };
         return rp(bulkRegisterOptions);
     })
@@ -105,7 +107,7 @@ landRecBackend.post("/register-node", function (req, res) {
 landRecBackend.post("/register-nodes-bulk", function (req, res) {
   const newNodeAddresses = req.body.nodeAddresses;
 
-  landRec.networkNodes.forEach((oneNodeUrl) => {
+  newNodeAddresses.forEach((oneNodeUrl) => {
     const nodeNotAlreadyPresent =
       landRec.networkNodes.indexOf(oneNodeUrl) == -1;
     const notCurrentNode = landRec.currentNodeUrl !== oneNodeUrl;
