@@ -65,9 +65,32 @@ landRecBackend.get('/mine',function(req,res){
  const newBlock = landRec.createNewBlock(nonce, previousBlockHash, hash)
 
 //part-2
+
+
  
 
 })
+
+landRecBackend.post("/receive-new-block", function (req, res) {
+   const newBlock = req.body.newBlock;
+   const lastBlock = landRec.getLastBlock();
+   const correctHash = lastBlock.hash === newBlock.previousBlockHash;
+   const correctIndex = lastBlock["index"] + 1 === newBlock["index"];
+
+   if (correctHash && correctIndex) {
+     landRec.chain.push(newBlock);
+     landRec.pendingTransactions = [];
+     res.json({
+       note: "New block received and accepted.",
+       newBlock: newBlock,
+     });
+   } else {
+     res.json({
+       note: "New block rejected.",
+       newBlock: newBlock,
+     });
+   }
+});
 
 
 landRecBackend.post('/register-broadcast-node',function(req,res){
