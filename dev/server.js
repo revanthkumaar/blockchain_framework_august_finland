@@ -58,6 +58,34 @@ landRecBackend.post("/transaction/broadcast", function (req, res) {
   });
 });
 
+//BROADCAST THE REWARD
+landRecBackend.post("/transaction/broadcast/reward", function (req, res) {
+  const newTransaction = landRec.createNewTransaction(
+    req.body.sender,
+    req.body.receiver,
+    req.body.reward
+  );
+
+  //broadcasting the transaction object to all other nodes
+
+  const requestPromises = [];
+  landRec.networkNodes.forEach((networkNodeUrl) => {
+    const requestOptions = {
+      url: networkNodeUrl + "/transaction",
+      method: "POST",
+      body: newTransaction,
+      json: true,
+    };
+    requestPromises.push(rp(requestOptions)); //call gets triggered
+  });
+
+  Promise.all(reqestPromises).then((data) => {
+    res.json({
+      note: "transaction got successfully broadcasted, will take few mins to validate your transaction",
+    });
+  });
+});
+
 //MAIN STEP-2 MINING THE BLOCKS
 landRecBackend.get("/mine", function (req, res) {
   //part-1
