@@ -52,6 +52,24 @@ landRecBackend.post('/transaction/broadcast',function(req,res){
    })
 })
 
+//MAIN STEP-2 MINING THE BLOCKS
+landRecBackend.get('/mine',function(req,res){
+  //part-1
+  const lastBlock = landRec.getLastBlock()
+  const previousBlockHash = lastBlock['hash']
+  const currentBlockData = {
+    transactions: landRec.pendingTransactions
+  }
+  const nonce = landRec.proofOfWork(previousBlockHash,currentBlockData)
+  const blockHash = landRec.generateHash(previousBlockHash,currentBlockData, nonce)
+ const newBlock = landRec.createNewBlock(nonce, previousBlockHash, hash)
+
+//part-2
+ 
+
+})
+
+
 landRecBackend.post('/register-broadcast-node',function(req,res){
   //STEP-1 register the new node address at the node where it pings first
   const newNodeUrl = req.body.newNodeUrl;
