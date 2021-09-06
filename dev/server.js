@@ -1,108 +1,72 @@
 const express = require("express");
 const landRecBackend = express();
-const Blockchain = require("./blockchain");
-const landRec = new Blockchain();
 const bodyParser = require("body-parser");
+const Blockchain = require("./blockchain");
+const uuid = require("uuid/v1");
+const port = process.argv[2];
+const rp = require("request-promise");
+
+const nodeAddress = uuid().split("-").join("");
+
+const landRec = new Blockchain();
+
 landRecBackend.use(bodyParser.json());
 landRecBackend.use(bodyParser.urlencoded({ extended: false }));
-const rp = require("request-promise");
-const port = process.argv[2];
 
-landRecBackend.get("/home", function (req, res) {
-  res.send("this is home page");
-});
-
+// get entire blockchain
 landRecBackend.get("/blockchain", function (req, res) {
   res.send(landRec);
 });
 
+// create a new transaction - only for single node
 landRecBackend.post("/transaction", function (req, res) {
-  const sellerName = req.body.seller;
-  const receiverName = req.body.receiver;
-  const assetValue = req.body.assetValue;
-  const transaction = {
-    sellerName: sellerName,
-    receiverName: receiverName,
-    assetValue: assetValue,
-  };
-  console.log(transaction);
-  res.json({ message: "transaction is created" });
+  const newTransaction = req.body;
+  const blockIndex =
+    landRec.addTransactionToPendingTransactions(newTransaction);
+  res.json({ note: `Transaction will be added in block ${blockIndex}.` });
 });
 
-//MAIN STEP-1 BROADCAST TRANSACTIONS //////////////////////////////////
-
+// broadcast transaction
 landRecBackend.post("/transaction/broadcast", function (req, res) {
   const newTransaction = landRec.createNewTransaction(
-    req.body.seller,
-    req.body.receiver,
-    req.body.asset
-  );
-
-  //broadcasting the transaction object to all other nodes
-
-  const requestPromises = [];
-  landRec.networkNodes.forEach((networkNodeUrl) => {
-    const requestOptions = {
-      url: networkNodeUrl + "/transaction",
-      method: "POST",
-      body: newTransaction,
-      json: true,
-    };
-    requestPromises.push(rp(requestOptions)); //call gets triggered
-  });
-
-  Promise.all(reqestPromises).then((data) => {
-    res.json({
-      note: "transaction got successfully broadcasted, will take few mins to validate your transaction",
-    });
-  });
-});
-
-//BROADCAST THE REWARD
-landRecBackend.post("/transaction/broadcast/reward", function (req, res) {
-  const newTransaction = landRec.createNewTransaction(
+    req.body.amount,
     req.body.sender,
-    req.body.receiver,
-    req.body.reward
+    req.body.recipient
   );
-
-  //broadcasting the transaction object to all other nodes
+  landRec.addTransactionToPendingTransactions(newTransaction);
 
   const requestPromises = [];
   landRec.networkNodes.forEach((networkNodeUrl) => {
     const requestOptions = {
-      url: networkNodeUrl + "/transaction",
+      uri: networkNodeUrl + "/transaction",
       method: "POST",
       body: newTransaction,
       json: true,
     };
-    requestPromises.push(rp(requestOptions)); //call gets triggered
+
+    requestPromises.push(rp(requestOptions));
   });
 
-  Promise.all(reqestPromises).then((data) => {
-    res.json({
-      note: "transaction got successfully broadcasted, will take few mins to validate your transaction",
-    });
+  Promise.all(requestPromises).then((data) => {
+    res.json({ note: "Transaction created and broadcast successfully." });
   });
 });
 
-//MAIN STEP-2 MINING THE BLOCKS
+// mine a block
 landRecBackend.get("/mine", function (req, res) {
-  //part-1
   const lastBlock = landRec.getLastBlock();
   const previousBlockHash = lastBlock["hash"];
   const currentBlockData = {
     transactions: landRec.pendingTransactions,
+    index: lastBlock["index"] + 1,
   };
   const nonce = landRec.proofOfWork(previousBlockHash, currentBlockData);
-  const blockHash = landRec.generateHash(
+  const blockHash = landRec.hashBlock(
     previousBlockHash,
     currentBlockData,
     nonce
   );
-  const newBlock = landRec.createNewBlock(nonce, previousBlockHash, hash);
-
-  //part-2 - broadcast node to all other nodes
+  const newBlock = landRec.createNewBlock(nonce, previousBlockHash, blockHash);
 
   const requestPromises = [];
   landRec.networkNodes.forEach((networkNodeUrl) => {
@@ -119,10 +83,10 @@ landRecBackend.get("/mine", function (req, res) {
   Promise.all(requestPromises)
     .then((data) => {
       const requestOptions = {
-        uri: landRec.currentNodeUrl + "/transaction/broadcast/reward",
+        uri: landRec.currentNodeUrl + "/transaction/broadcast",
         method: "POST",
         body: {
-          amount: 6.5,
+          amount: 12.5,
           sender: "00",
           recipient: nodeAddress,
         },
@@ -139,6 +103,7 @@ landRecBackend.get("/mine", function (req, res) {
     });
 });
 
+// receive new block
 landRecBackend.post("/receive-new-block", function (req, res) {
   const newBlock = req.body.newBlock;
   const lastBlock = landRec.getLastBlock();
@@ -160,72 +125,68 @@ landRecBackend.post("/receive-new-block", function (req, res) {
   }
 });
 
-landRecBackend.post("/register-broadcast-node", function (req, res) {
-  //STEP-1 register the new node address at the node where it pings first
+// register a node and broadcast it the network
+landRecBackend.post("/register-and-broadcast-node", function (req, res) {
   const newNodeUrl = req.body.newNodeUrl;
-  console.log(newNodeUrl);
-  console.log(landRec.networkNodes);
-  if (landRec.networkNodes.indexOf(newNodeUrl) == -1) {
+  if (landRec.networkNodes.indexOf(newNodeUrl) == -1)
     landRec.networkNodes.push(newNodeUrl);
-  }
 
-  //STEP-2 let 3002 broadcast the new node info to all the others in the network
   const regNodesPromises = [];
   landRec.networkNodes.forEach((networkNodeUrl) => {
     const requestOptions = {
-      url: networkNodeUrl + "/register-node",
+      uri: networkNodeUrl + "/register-node",
       method: "POST",
       body: { newNodeUrl: newNodeUrl },
       json: true,
     };
-    regNodesPromises.push(rp(requestOptions)); //call gets triggered
-  });
 
-  //STEP-3 BULK REGISTRY OF OTHER NODES AT 3004
+    regNodesPromises.push(rp(requestOptions));
+  });
 
   Promise.all(regNodesPromises)
     .then((data) => {
       const bulkRegisterOptions = {
-        url: newNodeUrl + "/register-nodes-bulk",
+        uri: newNodeUrl + "/register-nodes-bulk",
         method: "POST",
         body: {
-          nodeAddresses: [...landRec.networkNodes, landRec.currentNodeUrl],
+          allNetworkNodes: [...landRec.networkNodes, landRec.currentNodeUrl],
         },
         json: true,
       };
+
       return rp(bulkRegisterOptions);
     })
     .then((data) => {
-      res.json({ note: "new node registered successfully" });
+      res.json({ note: "New node registered with network successfully." });
     });
 });
 
+// register a node with the network
 landRecBackend.post("/register-node", function (req, res) {
-  const newNodeAddress = req.body.nodeAddress;
-  const nodeNotAlreadyPresent =
-    landRec.networkNodes.indexOf(newNodeAddress) == -1;
-  const notCurrentNode = landRec.currentNodeUrl !== newNodeAddress;
-  if (nodeNotAlreadyPresent && notCurrentNode) {
-    landRec.networkNodes.push(newNodeAddress);
-    res.json({ note: "new node registered successfully" });
-  }
+  const newNodeUrl = req.body.newNodeUrl;
+  const nodeNotAlreadyPresent = landRec.networkNodes.indexOf(newNodeUrl) == -1;
+  const notCurrentNode = landRec.currentNodeUrl !== newNodeUrl;
+  if (nodeNotAlreadyPresent && notCurrentNode)
+    landRec.networkNodes.push(newNodeUrl);
+  res.json({ note: "New node registered successfully." });
 });
 
+// register multiple nodes at once
 landRecBackend.post("/register-nodes-bulk", function (req, res) {
-  const newNodeAddresses = req.body.nodeAddresses;
-
-  newNodeAddresses.forEach((oneNodeUrl) => {
+  const allNetworkNodes = req.body.allNetworkNodes;
+  allNetworkNodes.forEach((networkNodeUrl) => {
     const nodeNotAlreadyPresent =
-      landRec.networkNodes.indexOf(oneNodeUrl) == -1;
-    const notCurrentNode = landRec.currentNodeUrl !== oneNodeUrl;
-    if (nodeNotAlreadyPresent && notCurrentNode) {
-      landRec.networkNodes.push(oneNodeUrl);
-    }
+      landRec.networkNodes.indexOf(networkNodeUrl) == -1;
+    const notCurrentNode = landRec.currentNodeUrl !== networkNodeUrl;
+    if (nodeNotAlreadyPresent && notCurrentNode)
+      landRec.networkNodes.push(networkNodeUrl);
   });
+
+  res.json({ note: "Bulk registration successful." });
 });
 
-landRecBackend.get('/consensus',function(req,res){
-//step-1
+// consensus
+landRecBackend.get("/consensus", function (req, res) {
   const requestPromises = [];
   landRec.networkNodes.forEach((networkNodeUrl) => {
     const requestOptions = {
@@ -233,18 +194,17 @@ landRecBackend.get('/consensus',function(req,res){
       method: "GET",
       json: true,
     };
+
     requestPromises.push(rp(requestOptions));
   });
 
-  Promise.all(requestPromises)
-  .then(blockchains => {
+  Promise.all(requestPromises).then((blockchains) => {
     const currentChainLength = landRec.chain.length;
     let maxChainLength = currentChainLength;
     let newLongestChain = null;
-    let newPendingTransactions = null; 
+    let newPendingTransactions = null;
 
-    
-		blockchains.forEach((blockchain) => {
+    blockchains.forEach((blockchain) => {
       if (blockchain.chain.length > maxChainLength) {
         maxChainLength = blockchain.chain.length;
         newLongestChain = blockchain.chain;
@@ -252,36 +212,58 @@ landRecBackend.get('/consensus',function(req,res){
       }
     });
 
-      
-		if (!newLongestChain || (newLongestChain && !landrec.chainIsValid(newLongestChain))) {
-			res.json({
-				note: 'Current chain has not been replaced.',
-				chain: landRec.chain
-			});
-		}
-		else {
-			landRec.chain = newLongestChain;
-			landRec.pendingTransactions = newPendingTransactions;
-			res.json({
+    if (
+      !newLongestChain ||
+      (newLongestChain && !landRec.chainIsValid(newLongestChain))
+    ) {
+      res.json({
+        note: "Current chain has not been replaced.",
+        chain: landRec.chain,
+      });
+    } else {
+      landRec.chain = newLongestChain;
+      landRec.pendingTransactions = newPendingTransactions;
+      res.json({
         note: "This chain has been replaced.",
         chain: landRec.chain,
       });
-		}
+    }
+  });
+});
 
+// get block by blockHash
+landRecBackend.get("/block/:blockHash", function (req, res) {
+  const blockHash = req.params.blockHash;
+  const correctBlock = landRec.getBlock(blockHash);
+  res.json({
+    block: correctBlock,
+  });
+});
 
+// get transaction by transactionId
+landRecBackend.get("/transaction/:transactionId", function (req, res) {
+  const transactionId = req.params.transactionId;
+  const trasactionData = landRec.getTransaction(transactionId);
+  res.json({
+    transaction: trasactionData.transaction,
+    block: trasactionData.block,
+  });
+});
 
+// get address by address
+landRecBackend.get("/address/:address", function (req, res) {
+  const address = req.params.address;
+  const addressData = landRec.getAddressData(address);
+  res.json({
+    addressData: addressData,
+  });
+});
 
-  })
-
-
-
-})
-
-landRecBackend.get('/block-explorer',function (req, res){
-  res.sendFile('./block-explorer/index.html',{root: __dirname})
-})
-
+// block explorer
+landRecBackend.get("/block-explorer", function (req, res) {
+  res.sendFile("./block-explorer/index.html", { root: __dirname });
+});
 
 landRecBackend.listen(port, function () {
-  console.log(`Listening on port ${port}`);
+  console.log(`Listening on port ${port}...`);
 });
