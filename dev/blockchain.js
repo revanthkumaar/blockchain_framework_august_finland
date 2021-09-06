@@ -1,14 +1,17 @@
 const sha256 = require("sha256");
+const currentNodeUrl = process.argv[3];
+const uuid = require("uuid/v1");
 
 function Blockchain() {
-  this.chain = []; //to store the blocks information
+  this.chain = [];
   this.pendingTransactions = [];
+
+  this.currentNodeUrl = currentNodeUrl;
   this.networkNodes = [];
-  this.currentNodeUrl = process.argv[3];
-  this.createNewBlock("0", "0", "0"); //genesis
+
+  this.createNewBlock(1435345300, "dasdadsasdasd", "asdasdasdas0");
 }
 
-//to create the block
 Blockchain.prototype.createNewBlock = function (
   nonce,
   previousBlockHash,
@@ -22,8 +25,10 @@ Blockchain.prototype.createNewBlock = function (
     hash: hash,
     previousBlockHash: previousBlockHash,
   };
-  this.pendingTransactions = []; //once the block gets created delete all the pending trs
+
+  this.pendingTransactions = [];
   this.chain.push(newBlock);
+
   return newBlock;
 };
 
@@ -31,7 +36,6 @@ Blockchain.prototype.getLastBlock = function () {
   return this.chain[this.chain.length - 1];
 };
 
-//to create a transaction
 Blockchain.prototype.createNewTransaction = function (
   amount,
   sender,
@@ -41,23 +45,27 @@ Blockchain.prototype.createNewTransaction = function (
     amount: amount,
     sender: sender,
     recipient: recipient,
+    transactionId: uuid().split("-").join(""),
   };
+
+  return newTransaction;
 };
-//to add trs to pending transactions
+
 Blockchain.prototype.addTransactionToPendingTransactions = function (
   transactionObj
 ) {
   this.pendingTransactions.push(transactionObj);
+  return this.getLastBlock()["index"] + 1;
 };
 
-Blockchain.prototype.generateHash = function (
+Blockchain.prototype.hashBlock = function (
   previousBlockHash,
   currentBlockData,
   nonce
 ) {
-  const dataString =
-    previousBlockHash + JSON.stringify(currentBlockData) + nonce.toString();
-  const hash = sha256(dataString);
+  const dataAsString =
+    previousBlockHash + nonce.toString() + JSON.stringify(currentBlockData);
+  const hash = sha256(dataAsString);
   return hash;
 };
 
@@ -66,13 +74,12 @@ Blockchain.prototype.proofOfWork = function (
   currentBlockData
 ) {
   let nonce = 0;
-  let hash = this.generateHash(previousBlockHash, currentBlockData, nonce);
-  //cryptographic puzzle
-  while (hash.substring(0, 5) != "00000") {
+  let hash = this.hashBlock(previousBlockHash, currentBlockData, nonce);
+  while (hash.substring(0, 5) !== "00000") {
     nonce++;
-    hash = this.generateHash(previousBlockHash, currentBlockData, nonce);
-    console.log(hash);
+    hash = this.hashBlock(previousBlockHash, currentBlockData, nonce);
   }
+
   return nonce;
 };
 
@@ -112,4 +119,53 @@ Blockchain.prototype.chainIsValid = function (blockchain) {
   return validChain;
 };
 
-module.exports = Blockchain; //give access to other files to import the constructor Blockchain
+Blockchain.prototype.getBlock = function (blockHash) {
+  let correctBlock = null;
+  this.chain.forEach((block) => {
+    if (block.hash === blockHash) correctBlock = block;
+  });
+  return correctBlock;
+};
+
+Blockchain.prototype.getTransaction = function (transactionId) {
+  let correctTransaction = null;
+  let correctBlock = null;
+
+  this.chain.forEach((block) => {
+    block.transactions.forEach((transaction) => {
+      if (transaction.transactionId === transactionId) {
+        correctTransaction = transaction;
+        correctBlock = block;
+      }
+    });
+  });
+
+  return {
+    transaction: correctTransaction,
+    block: correctBlock,
+  };
+};
+
+Blockchain.prototype.getAddressData = function (address) {
+  const addressTransactions = [];
+  this.chain.forEach((block) => {
+    block.transactions.forEach((transaction) => {
+      if (transaction.sender === address || transaction.recipient === address) {
+        addressTransactions.push(transaction);
+      }
+    });
+  });
+
+  let balance = 0;
+  addressTransactions.forEach((transaction) => {
+    if (transaction.recipient === address) balance += transaction.amount;
+    else if (transaction.sender === address) balance -= transaction.amount;
+  });
+
+  return {
+    addressTransactions: addressTransactions,
+    addressBalance: balance,
+  };
+};
+
+module.exports = Blockchain;
