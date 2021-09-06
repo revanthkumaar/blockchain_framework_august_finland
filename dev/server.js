@@ -224,6 +224,64 @@ landRecBackend.post("/register-nodes-bulk", function (req, res) {
   });
 });
 
+landRecBackend.get('/consensus',function(req,res){
+//step-1
+  const requestPromises = [];
+  landRec.networkNodes.forEach((networkNodeUrl) => {
+    const requestOptions = {
+      uri: networkNodeUrl + "/blockchain",
+      method: "GET",
+      json: true,
+    };
+    requestPromises.push(rp(requestOptions));
+  });
+
+  Promise.all(requestPromises)
+  .then(blockchains => {
+    const currentChainLength = landRec.chain.length;
+    let maxChainLength = currentChainLength;
+    let newLongestChain = null;
+    let newPendingTransactions = null; 
+
+    
+		blockchains.forEach((blockchain) => {
+      if (blockchain.chain.length > maxChainLength) {
+        maxChainLength = blockchain.chain.length;
+        newLongestChain = blockchain.chain;
+        newPendingTransactions = blockchain.pendingTransactions;
+      }
+    });
+
+      
+		if (!newLongestChain || (newLongestChain && !landrec.chainIsValid(newLongestChain))) {
+			res.json({
+				note: 'Current chain has not been replaced.',
+				chain: landRec.chain
+			});
+		}
+		else {
+			landRec.chain = newLongestChain;
+			landRec.pendingTransactions = newPendingTransactions;
+			res.json({
+        note: "This chain has been replaced.",
+        chain: landRec.chain,
+      });
+		}
+
+
+
+
+  })
+
+
+
+})
+
+landRecBackend.get('/block-explorer',function (req, res){
+  res.sendFile('./block-explorer/index.html',{root: __dirname})
+})
+
+
 landRecBackend.listen(port, function () {
   console.log(`Listening on port ${port}`);
 });
